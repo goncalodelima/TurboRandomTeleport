@@ -36,7 +36,7 @@ The last question already answers this question quite a bit... But basically, th
 
 1. Download the latest version of TurboRandomTeleport from one of the following sources:
     - [GitHub Releases](https://github.com/goncalodelima/TurboRandomTeleport/releases)
-    - [SpigotMC](https://www.spigotmc.org/resources/free-multi-economy-plugin-with-multi-server-support.131260/)
+    - [SpigotMC](https://www.spigotmc.org/resources/turborandomteleport.133313/)
 
 2. Install WorldManager or Multiverse-Core
 
