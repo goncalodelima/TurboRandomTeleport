@@ -1,0 +1,18 @@
+rtp:
+  size: 27
+  title: "ʀᴀɴᴅᴏᴍ ᴛᴇʟᴇᴘᴏʀᴛ"
+  overWorld:
+    slot: 11 # use -1 to remove this item
+    name: "<green>ᴏᴠᴇʀᴡᴏʀʟᴅ"
+    lore:
+      - "<white>Click to randomly teleport"
+  nether:
+    slot: 13 # use -1 to remove this item
+    name: "<green>ɴᴇᴛʜᴇʀ"
+    lore:
+      - "<white>Click to randomly teleport"
+  end:
+    slot: 15 # use -1 to remove this item
+    name: "<green>ᴇɴᴅ"
+    lore:
+      - "<white>Click to randomly teleport"

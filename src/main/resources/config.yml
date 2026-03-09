@@ -1,0 +1,28 @@
+command:
+
+  # Delay required before a player can use RTP again.
+  # Prevents players from spamming the command and generating too many chunks,
+  # which could leave the world without valid locations.
+  cooldown-between: 15 # in seconds
+
+
+# Worlds reserved for RTP resources (do NOT create worlds with these names):
+#   - resources_world (Overworld)
+#   - resources_nether_world (Nether)
+#   - resources_end_world (End)
+# If you don't want a world to be used for RTP, simply avoid creating a world with its name.
+
+world:
+
+  # Number of pre-generated locations stored in a ring buffer so that when a player teleports,
+  # the chunks of the chosen location have already been generated, resulting in an instant teleport.
+  # Don't touch this if you don't know what you're doing!
+  buffer-size: 100
+
+  # The coordinates by which the player teleports to a world are between -range and +range.
+  # Set a high value because resetting worlds requires manually creating a new world;
+  # the plugin doesn't automatically create a new world because the worlds are huge,
+  # and you'll only need to reset them after a long period of uptime.
+  # Very large worlds were adopted in this plugin to ensure that the player
+  # only teleports using /rtp to a chunk that has not yet been explored; guaranteeing a good player experience.
+  generate-coordenates-range: 1_000_000

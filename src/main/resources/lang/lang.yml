@@ -1,0 +1,3 @@
+rtp-cooldown: "<red>Please wait a few seconds before typing this command again."
+teleport-success: "<green>You have been successfully teleported! You are invincible for 5 seconds..."
+try-again: "<red>Try again."
