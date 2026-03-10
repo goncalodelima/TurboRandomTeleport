@@ -24,10 +24,8 @@ package pt.gongas.rtp.listener;
 import org.bukkit.Bukkit;
 import org.bukkit.Chunk;
 import org.bukkit.World;
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
@@ -131,13 +129,6 @@ public class WorldListener implements Listener {
             worldType.getLinkedBuffer().invalidateChunk(chunk);
         }
 
-    }
-
-    @EventHandler
-    public void onPlayerJoin(PlayerJoinEvent event) {
-        Player player = event.getPlayer();
-        player.setInvulnerable(false);
-        player.sendMessage("isInvulnerable?: " + player.isInvulnerable());
     }
 
     private void loadResourcesWorld(World world, WorldType worldType, String worldName) {
