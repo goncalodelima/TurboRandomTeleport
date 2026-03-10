@@ -199,6 +199,7 @@ public class RtpInventory implements Listener {
                 player.sendMessage(teleportMessage);
 
             } else {
+                locationLinkedBuffer.failPop();
                 locationLinkedBuffer.push(location, location.getBlockX() >> 4, location.getBlockZ() >> 4);
             }
 

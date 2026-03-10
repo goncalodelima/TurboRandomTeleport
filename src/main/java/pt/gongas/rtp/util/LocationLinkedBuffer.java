@@ -147,6 +147,19 @@ public class LocationLinkedBuffer {
     }
 
     /**
+     * Cancels a previously pending pop operation.
+     * <p>
+     * This should be called if a popPending() operation fails,
+     * for example if an asynchronous teleport fails.
+     * </p>
+     */
+    public void failPop() {
+        if (pendingAsync > 0) {
+            pendingAsync--;
+        }
+    }
+
+    /**
      * Invalidates all nodes within the specified chunk.
      * Removes them from the linked list and decrements the occupied counter.
      *
