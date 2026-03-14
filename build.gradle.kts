@@ -87,10 +87,9 @@ bukkit {
     name = "TurboRandomTeleport"
     version = "${project.version}"
     main = "pt.gongas.rtp.RtpPlugin"
-    depend = listOf("redis-plugin")
     author = "ReeachyZ_"
     website = "https://github.com/goncalodelima/TurboRandomTeleport"
-    softDepend = listOf("WorldManager", "Multiverse-Core")
+    softDepend = listOf("WorldManager", "Multiverse-Core", "redis-plugin")
     description = "Free Random Teleport Plugin"
     apiVersion = "1.21"
 }
