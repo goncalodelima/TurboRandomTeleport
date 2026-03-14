@@ -45,6 +45,29 @@ The last question already answers this question quite a bit... But basically, th
 4. Configure the plugin:
    - After placing the plugin and starting your server once, you can configure it in `config.yml` and other files. The `data` folder stores locations in memory on disk, so when the server restarts, it doesn’t need to find new locations—previously found valid locations are already saved and remain unexplored.
 
+---
+
+### Cross-Server Support (Optional)
+
+TurboRandomTeleport supports random teleportation between multiple servers.
+
+To enable this feature:
+
+1. Install the **Redis-Plugin** on every server where TurboRandomTeleport is installed.
+2. Ensure that a **Redis server is running**.
+3. Start the server once so the configuration files are generated.
+4. In `config.yml`, configure the `cross-server-support` section:
+    - Set `cross-server-support.enabled` to `true` on **all servers**.
+    - Configure `cross-server-support.secondary-server` depending on the server role:
+        - `false` → for servers that contain the worlds where players will be randomly teleported.
+        - `true` → for servers that **do not contain RTP worlds** and only redirect players to another server.
+
+Servers with `secondary-server: true` will forward players to the server specified in `main-server-name`.
+
+All servers participating in cross-server teleportation **must share the same Redis instance**.
+
+---
+
 > ⚠️ **Important**
 > Do not pre-generate chunks using plugins like Chunky or WorldBorder. These tools are designed for small worlds.  
 > TurboRandomTeleport is intended for extremely large worlds, and pre-generating millions of blocks would consume terabytes of disk space and could take years to complete.
