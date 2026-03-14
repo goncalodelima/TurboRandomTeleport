@@ -188,6 +188,12 @@ public class LinkedBufferRunnable extends BukkitRunnable {
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
 
+                // If this method was called, it means (0,0) has already been checked
+                // and is invalid, so we skip it
+                if (x == 0 && z == 0) {
+                    continue;
+                }
+
                 Location location = new Location(world, baseX + x, 0, baseZ + z);
                 Pair<Integer, CollisionType> pair = LocationUtil.getHighestSafeBlockYAt(world, location);
 

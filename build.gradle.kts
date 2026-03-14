@@ -62,7 +62,7 @@ java {
 }
 
 group = "pt.gongas"
-version = "1.0.2"
+version = "1.0.3"
 
 paperweight {
     javaLauncher = javaToolchains.launcherFor {
