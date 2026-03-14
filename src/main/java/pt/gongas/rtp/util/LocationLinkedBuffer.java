@@ -63,7 +63,7 @@ public class LocationLinkedBuffer {
     private final int capacity;
 
     /** Number of pending "popPending" operations awaiting confirmation */
-    private int pendingAsync = 0;
+    private int pending = 0;
 
     /** Mapping from chunk key to set of Nodes for fast invalidation */
     private final Map<Long, Set<Node>> chunkMap = new HashMap<>();
@@ -139,8 +139,8 @@ public class LocationLinkedBuffer {
      */
     public void confirmPop() {
 
-        if (pendingAsync > 0) {
-            pendingAsync--;
+        if (pending > 0) {
+            pending--;
             occupied--;
         }
 
@@ -154,8 +154,8 @@ public class LocationLinkedBuffer {
      * </p>
      */
     public void failPop() {
-        if (pendingAsync > 0) {
-            pendingAsync--;
+        if (pending > 0) {
+            pending--;
         }
     }
 
@@ -231,7 +231,7 @@ public class LocationLinkedBuffer {
     /**
      * Internal method to remove and return the head node.
      *
-     * @param markPending if true, increment pendingAsync instead of decrementing occupied
+     * @param markPending if true, increment pending instead of decrementing occupied
      * @return the removed Node, or null if buffer is empty
      */
     private Node removeHead(boolean markPending) {
@@ -251,7 +251,7 @@ public class LocationLinkedBuffer {
         }
 
         if (markPending) {
-            pendingAsync++;
+            pending++;
         } else {
             occupied--;
         }

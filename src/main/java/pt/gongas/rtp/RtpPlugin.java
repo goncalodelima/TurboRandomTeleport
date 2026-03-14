@@ -28,15 +28,30 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.Nullable;
+import org.redisson.api.RSet;
+import pt.gongas.redis.redis.RedisManager;
 import pt.gongas.rtp.command.RtpCommand;
 import pt.gongas.rtp.inventory.RtpInventory;
 import pt.gongas.rtp.inventory.holder.RtpInventoryHolder;
+import pt.gongas.rtp.listener.MainServerListener;
 import pt.gongas.rtp.listener.WorldListener;
+import pt.gongas.rtp.manager.RtpManager;
+import pt.gongas.rtp.store.cooldown.CooldownStore;
+import pt.gongas.rtp.store.cooldown.LocalCooldownStore;
+import pt.gongas.rtp.store.cooldown.RedisCooldownStore;
+import pt.gongas.rtp.store.lock.LocalTeleportLockStore;
+import pt.gongas.rtp.store.lock.RedisTeleportLockStore;
+import pt.gongas.rtp.store.lock.TeleportLockStore;
+import pt.gongas.rtp.store.request.RedisTeleportRequestStore;
+import pt.gongas.rtp.store.request.TeleportRequestStore;
 import pt.gongas.rtp.util.ExpiringMap;
 import pt.gongas.rtp.util.LocationLinkedBuffer;
 import pt.gongas.rtp.util.config.Configuration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
+import java.io.IOException;
 import java.util.*;
 
 public class RtpPlugin extends JavaPlugin {
@@ -44,6 +59,10 @@ public class RtpPlugin extends JavaPlugin {
     private final List<LocationLinkedBuffer> linkedBuffers = new LinkedList<>();
 
     private Random random;
+
+    private byte[] connectMessage;
+
+    private RSet<Boolean> pendingTeleportPlayers;
 
     private Configuration data;
 
@@ -53,6 +72,8 @@ public class RtpPlugin extends JavaPlugin {
     public void onEnable() {
 
         random = new Random();
+
+        pendingTeleportPlayers = RedisManager.getClient().getSetCache("pending_rtp");
 
         saveDefaultConfig();
 
@@ -65,37 +86,93 @@ public class RtpPlugin extends JavaPlugin {
         Configuration inventory = new Configuration(this, "inventory", "inventory.yml");
         inventory.saveDefaultConfig();
 
-        long commandCooldown = Math.min(1, getConfig().getLong("commandCooldown", 15));
+        boolean crossServerSupport = getConfig().getBoolean("cross-server-support.enabled");
+        boolean secondaryServer = getConfig().getBoolean("cross-server-support.secondary-server");
+        String serverName = getConfig().getString("cross-server-support.main-server-name", "smp");
 
-        int viewDistance = getServer().getViewDistance();
-        int bufferSize = Math.max(2, getConfig().getInt("world.buffer-size", 100));
-        int range = Math.max(1, getConfig().getInt("world.generate-coordenates-range", 1_000_000));
-
-        LocationLinkedBuffer overworldLinkedBuffer = new LocationLinkedBuffer(bufferSize);
-        LocationLinkedBuffer netherLinkedBuffer = new LocationLinkedBuffer(bufferSize);
-        LocationLinkedBuffer endLinkedBuffer = new LocationLinkedBuffer(bufferSize);
-
-        loadBuffer(overworldLinkedBuffer, "buffers.overworld");
-        loadBuffer(netherLinkedBuffer, "buffers.nether");
-        loadBuffer(endLinkedBuffer, "buffers.end");
-
-        WorldType.OVERWORLD.setLinkedBuffer(overworldLinkedBuffer);
-        WorldType.NETHER.setLinkedBuffer(netherLinkedBuffer);
-        WorldType.END.setLinkedBuffer(endLinkedBuffer);
-
-        linkedBuffers.add(overworldLinkedBuffer);
-        linkedBuffers.add(netherLinkedBuffer);
-        linkedBuffers.add(endLinkedBuffer);
-
+        long commandCooldown = Math.max(1, getConfig().getLong("command.cooldown-between", 15));
         ExpiringMap<UUID, Long> cooldownPlayers = new ExpiringMap<>(this, 20 * 30); // 30 seconds
 
-        RtpInventory rtpInventory = new RtpInventory(lang, inventory, overworldLinkedBuffer, netherLinkedBuffer, endLinkedBuffer, cooldownPlayers);
+        CooldownStore cooldownStore;
+        TeleportLockStore teleportLockStore;
+        TeleportRequestStore teleportRequestStore;
+
+        if (crossServerSupport) {
+            cooldownStore = new RedisCooldownStore(commandCooldown);
+            teleportLockStore = new RedisTeleportLockStore();
+            teleportRequestStore = new RedisTeleportRequestStore();
+        } else {
+
+            if (secondaryServer) {
+                throw new IllegalStateException("This server is set as secondary server but does not have the cross-server-support option enabled.");
+            }
+
+            cooldownStore = new LocalCooldownStore(cooldownPlayers);
+            teleportLockStore = new LocalTeleportLockStore();
+            teleportRequestStore = null; // no needed local implementation
+        }
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        DataOutputStream data = new DataOutputStream(out);
+
+        try {
+            data.writeUTF("Connect");
+            data.writeUTF(serverName);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        connectMessage = out.toByteArray();
+
+        RtpManager rtpManager = new RtpManager(getLogger(), lang, cooldownStore, teleportLockStore);
+
+        LocationLinkedBuffer overworldLinkedBuffer;
+        LocationLinkedBuffer netherLinkedBuffer;
+        LocationLinkedBuffer endLinkedBuffer;
+
+        if (secondaryServer) {
+
+            overworldLinkedBuffer = null;
+            netherLinkedBuffer = null;
+            endLinkedBuffer = null;
+
+            getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
+
+        } else {
+
+            int viewDistance = getServer().getViewDistance();
+            int bufferSize = Math.max(2, getConfig().getInt("world.buffer-size", 100));
+            int range = Math.max(1, getConfig().getInt("world.generate-coordenates-range", 1_000_000));
+
+            overworldLinkedBuffer = new LocationLinkedBuffer(bufferSize);
+            netherLinkedBuffer = new LocationLinkedBuffer(bufferSize);
+            endLinkedBuffer = new LocationLinkedBuffer(bufferSize);
+
+            loadBuffer(overworldLinkedBuffer, "buffers.overworld");
+            loadBuffer(netherLinkedBuffer, "buffers.nether");
+            loadBuffer(endLinkedBuffer, "buffers.end");
+
+            WorldType.OVERWORLD.setLinkedBuffer(overworldLinkedBuffer);
+            WorldType.NETHER.setLinkedBuffer(netherLinkedBuffer);
+            WorldType.END.setLinkedBuffer(endLinkedBuffer);
+
+            linkedBuffers.add(overworldLinkedBuffer);
+            linkedBuffers.add(netherLinkedBuffer);
+            linkedBuffers.add(endLinkedBuffer);
+
+            getServer().getPluginManager().registerEvents(new WorldListener(this, getLogger(), viewDistance, range), this);
+
+            if (crossServerSupport) {
+                getServer().getPluginManager().registerEvents(new MainServerListener(this, rtpManager, overworldLinkedBuffer, netherLinkedBuffer, endLinkedBuffer, teleportRequestStore), this);
+            }
+
+        }
+
+        RtpInventory rtpInventory = new RtpInventory(this, rtpManager, inventory, overworldLinkedBuffer, netherLinkedBuffer, endLinkedBuffer, teleportRequestStore, teleportLockStore, secondaryServer, connectMessage);
         getServer().getPluginManager().registerEvents(rtpInventory, this);
 
         BukkitCommandManager commandManager = new BukkitCommandManager(this);
-        commandManager.registerCommand(new RtpCommand(lang, rtpInventory, cooldownPlayers, commandCooldown * 1000));
-
-        getServer().getPluginManager().registerEvents(new WorldListener(this, getLogger(), viewDistance, range), this);
+        commandManager.registerCommand(new RtpCommand(this, lang, rtpInventory, teleportLockStore, cooldownStore, commandCooldown * 1000));
 
         // BStats Metrics
         metrics = new Metrics(this, 30015);
@@ -190,6 +267,14 @@ public class RtpPlugin extends JavaPlugin {
 
     public Random getRandom() {
         return random;
+    }
+
+    public byte[] getConnectMessage() {
+        return connectMessage;
+    }
+
+    public RSet<Boolean> getPendingTeleportPlayers() {
+        return pendingTeleportPlayers;
     }
 
 }

@@ -23,31 +23,32 @@ package pt.gongas.rtp.inventory;
 
 import io.papermc.paper.datacomponent.DataComponentTypes;
 import io.papermc.paper.datacomponent.item.ItemLore;
-import net.kyori.adventure.key.Key;
-import net.kyori.adventure.sound.Sound;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import org.bukkit.Location;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
-import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
+import pt.gongas.rtp.RtpPlugin;
+import pt.gongas.rtp.WorldType;
 import pt.gongas.rtp.inventory.holder.RtpInventoryHolder;
-import pt.gongas.rtp.util.ExpiringMap;
+import pt.gongas.rtp.manager.RtpManager;
+import pt.gongas.rtp.store.lock.TeleportLockStore;
+import pt.gongas.rtp.store.request.TeleportRequestStore;
 import pt.gongas.rtp.util.LocationLinkedBuffer;
 import pt.gongas.rtp.util.config.Configuration;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 public class RtpInventory implements Listener {
+
+    private final RtpPlugin plugin;
+
+    private final RtpManager rtpManager;
 
     private final LocationLinkedBuffer overworldLinkedBuffer;
 
@@ -55,9 +56,13 @@ public class RtpInventory implements Listener {
 
     private final LocationLinkedBuffer endLinkedBuffer;
 
-    private final ExpiringMap<UUID, Long> cooldownPlayers;
+    private final TeleportRequestStore teleportRequestStore;
 
-    private final Component teleportMessage;
+    private final TeleportLockStore teleportLockStore;
+
+    private final boolean secondaryServer;
+
+    private final byte[] connectMessage;
 
     private final int rows;
 
@@ -81,14 +86,9 @@ public class RtpInventory implements Listener {
 
     private final List<Component> endLore = new ArrayList<>();
 
-    private final PotionEffect resistanceEffect = new PotionEffect(PotionEffectType.RESISTANCE, 20 * 5, 255);
-
-    private final PotionEffect weaknessEffect = new PotionEffect(PotionEffectType.WEAKNESS, 20 * 5, 255);
-
-    private static final Sound TELEPORT_SOUND = Sound.sound(Key.key("entity.enderman.teleport"), Sound.Source.UI, 1f, 1f);
-
-    public RtpInventory(Configuration lang, Configuration inventory, LocationLinkedBuffer overworldLinkedBuffer, LocationLinkedBuffer netherLinkedBuffer, LocationLinkedBuffer endLinkedBuffer, ExpiringMap<UUID, Long> cooldownPlayers) {
-
+    public RtpInventory(RtpPlugin plugin, RtpManager rtpManager, Configuration inventory, LocationLinkedBuffer overworldLinkedBuffer, LocationLinkedBuffer netherLinkedBuffer, LocationLinkedBuffer endLinkedBuffer, TeleportRequestStore teleportRequestStore, TeleportLockStore teleportLockStore, boolean secondaryServer, byte[] connectMessage) {
+        this.plugin = plugin;
+        this.rtpManager = rtpManager;
         this.rows = inventory.getInt("rtp.size", 27);
         this.title = MiniMessage.miniMessage().deserialize(inventory.getString("rtp.title", "ʀᴀɴᴅᴏᴍ ᴛᴇʟᴇᴘᴏʀᴛ"));
         this.overWorldSlot = inventory.getInt("rtp.overWorld.slot", 11);
@@ -97,10 +97,12 @@ public class RtpInventory implements Listener {
         this.overworldLinkedBuffer = overworldLinkedBuffer;
         this.netherLinkedBuffer = netherLinkedBuffer;
         this.endLinkedBuffer = endLinkedBuffer;
-        this.cooldownPlayers = cooldownPlayers;
-        this.teleportMessage = MiniMessage.miniMessage().deserialize(lang.getString("teleport-success", "<green>You have been successfully teleported! You are invincible for 5 seconds..."));
+        this.teleportRequestStore = teleportRequestStore;
+        this.teleportLockStore = teleportLockStore;
 
         this.overworldName = MiniMessage.miniMessage().deserialize(inventory.getString("rtp.overWorld.name", "<green>ᴏᴠᴇʀᴡᴏʀʟᴅ"));
+        this.secondaryServer = secondaryServer;
+        this.connectMessage = connectMessage;
 
         for (String string : inventory.getStringList("rtp.overWorld.lore")) {
             overworldLore.add(MiniMessage.miniMessage().deserialize(string));
@@ -161,51 +163,59 @@ public class RtpInventory implements Listener {
         int slot = event.getRawSlot();
 
         if (slot == overWorldSlot) {
-            handleClick(event.getWhoClicked(), overworldLinkedBuffer);
+            handleClick((Player) event.getWhoClicked(), overworldLinkedBuffer, WorldType.OVERWORLD);
         } else if (slot == netherSlot) {
-            handleClick(event.getWhoClicked(), netherLinkedBuffer);
+            handleClick((Player) event.getWhoClicked(), netherLinkedBuffer, WorldType.NETHER);
         } else if (slot == endSlot) {
-            handleClick(event.getWhoClicked(), endLinkedBuffer);
+            handleClick((Player) event.getWhoClicked(), endLinkedBuffer, WorldType.END);
         }
 
     }
 
-    private void handleClick(HumanEntity player, LocationLinkedBuffer locationLinkedBuffer) {
+    private void handleClick(Player player, LocationLinkedBuffer locationLinkedBuffer, WorldType worldType) {
 
         player.closeInventory();
 
-        // Pop a location from the buffer in a "pending" state.
-        // This ensures the location is temporarily reserved and not taken by another teleport
-        // while the async teleport is in progress. The occupied counter will only be decremented
-        // if the teleport succeeds (via confirmPop()), otherwise the location is returned to the buffer.
-        Location location = locationLinkedBuffer.popPending();
+        System.out.println("step A");
 
-        if (location == null) {
-            return;
-        }
+        teleportLockStore.add(player.getUniqueId())
+                .thenAcceptAsync(added -> {
 
-        player.teleportAsync(location.add(0.5, 0, 0.5)).thenAccept(success -> {
+                    if (!added) {
+                        System.out.println("step B");
+                        return;
+                    }
 
-            if (success) {
+                    System.out.println("step C");
 
-                locationLinkedBuffer.confirmPop();
+                    if (secondaryServer) {
 
-                // Potions are used to give the player resistance so that they don't take damage,
-                // and they can't damage anyone in the first 5 seconds of teleportation.
-                player.addPotionEffect(resistanceEffect);
-                player.addPotionEffect(weaknessEffect);
+                        System.out.println("step D");
 
-                player.playSound(TELEPORT_SOUND, Sound.Emitter.self());
-                player.sendMessage(teleportMessage);
+                        teleportRequestStore.put(player.getUniqueId(), worldType.name())
+                                .thenAcceptAsync(stored -> {
 
-            } else {
-                locationLinkedBuffer.failPop();
-                locationLinkedBuffer.push(location, location.getBlockX() >> 4, location.getBlockZ() >> 4);
-            }
+                                    System.out.println("step E");
 
-        });
+                                    if (!stored) {
+                                        System.out.println("step F");
+                                        teleportLockStore.remove(player.getUniqueId());
+                                        return;
+                                    }
 
-        cooldownPlayers.put(player.getUniqueId(), System.currentTimeMillis());
+                                    System.out.println("step G");
+                                    player.sendPluginMessage(plugin, "BungeeCord", connectMessage);
+                                    System.out.println("step H");
+
+                                }, Bukkit.getScheduler().getMainThreadExecutor(plugin));
+
+                    } else {
+                        System.out.println("step I");
+                        rtpManager.teleportPlayer(player, locationLinkedBuffer);
+                    }
+
+                }, Bukkit.getScheduler().getMainThreadExecutor(plugin));
+
     }
 
 }

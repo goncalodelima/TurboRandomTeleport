@@ -62,7 +62,7 @@ java {
 }
 
 group = "pt.gongas"
-version = "1.0.3"
+version = "1.1.0"
 
 paperweight {
     javaLauncher = javaToolchains.launcherFor {
@@ -87,6 +87,7 @@ bukkit {
     name = "TurboRandomTeleport"
     version = "${project.version}"
     main = "pt.gongas.rtp.RtpPlugin"
+    depend = listOf("redis-plugin")
     author = "ReeachyZ_"
     website = "https://github.com/goncalodelima/TurboRandomTeleport"
     softDepend = listOf("WorldManager", "Multiverse-Core")

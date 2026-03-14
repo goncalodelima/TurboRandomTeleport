@@ -26,3 +26,21 @@ world:
   # Very large worlds were adopted in this plugin to ensure that the player
   # only teleports using /rtp to a chunk that has not yet been explored; guaranteeing a good player experience.
   generate-coordenates-range: 1_000_000
+
+
+# Section to add support for random teleportation between different servers.
+cross-server-support:
+
+  # Enable this if you want random teleportation support between servers.
+  # This option needs to be active on all servers with this plugin
+  # (regardless of whether the server is secondary or primary).
+  # Redis is required (install the Redis plugin and ensure Redis is running).
+  enabled: false
+
+  # Set this option to true if the server where this plugin is running does not have random teleport worlds.
+  secondary-server: false
+
+  # When the player types /rtp, the player will be redirected to server X, which is listed here.
+  # Server X must have the random teleport plugin enabled, and the secondary-server option
+  # on server X must be set to false.
+  main-server-name: "smp"
