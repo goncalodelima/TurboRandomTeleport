@@ -55,6 +55,21 @@ public class MainServerListener implements Listener {
         this.teleportRequestStore = teleportRequestStore;
     }
 
+    /**
+     * Handles players joining a server that contains RTP worlds.
+     * <p>
+     * When cross-server support is enabled, a player may execute /rtp on another server.
+     * In that case, the request is stored in Redis and the player is redirected
+     * to a server that contains the RTP worlds.
+     * <p>
+     * When the player joins this server, we check if a teleport request exists.
+     * If so, the player is teleported using the appropriate world buffer.
+     * <p>
+     * If the player's connection is interrupted before BungeeCord finishes redirecting
+     * the player to the intended RTP server, the player may end up joining a different
+     * RTP server instead. This is not an issue: as long as the server the player joins
+     * has RTP worlds available, the teleport request will still be processed correctly.
+     */
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
 
