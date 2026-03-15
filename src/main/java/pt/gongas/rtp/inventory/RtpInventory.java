@@ -176,41 +176,28 @@ public class RtpInventory implements Listener {
 
         player.closeInventory();
 
-        System.out.println("step A");
-
         teleportLockStore.add(player.getUniqueId())
                 .thenAcceptAsync(added -> {
 
                     if (!added) {
-                        System.out.println("step B");
                         return;
                     }
 
-                    System.out.println("step C");
-
                     if (secondaryServer) {
-
-                        System.out.println("step D");
 
                         teleportRequestStore.put(player.getUniqueId(), worldType.name())
                                 .thenAcceptAsync(stored -> {
 
-                                    System.out.println("step E");
-
                                     if (!stored) {
-                                        System.out.println("step F");
                                         teleportLockStore.remove(player.getUniqueId());
                                         return;
                                     }
 
-                                    System.out.println("step G");
                                     player.sendPluginMessage(plugin, "BungeeCord", connectMessage);
-                                    System.out.println("step H");
 
                                 }, Bukkit.getScheduler().getMainThreadExecutor(plugin));
 
                     } else {
-                        System.out.println("step I");
                         rtpManager.teleportPlayer(player, locationLinkedBuffer);
                     }
 
