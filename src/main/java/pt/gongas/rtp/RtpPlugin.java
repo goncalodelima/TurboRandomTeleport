@@ -109,7 +109,7 @@ public class RtpPlugin extends JavaPlugin {
 
             cooldownStore = new LocalCooldownStore(cooldownPlayers);
             teleportLockStore = new LocalTeleportLockStore();
-            teleportRequestStore = null; // no needed local implementation
+            teleportRequestStore = null; // no local implementation needed
         }
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
